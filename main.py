@@ -64,13 +64,12 @@ async def kick(client, event, args):
 
     chat = await client.get_entity(event.chat_id)
     permissions = await client.get_permissions(chat, 'me')
-    me = await client.get_me()
 
     tags =  []
     for user in should_get_kicked:
-        if permissions.is_admin and me.id != user.id:
+        if permissions.is_admin and not user.is_self:
             await client.kick_participant(entity=chat, user=user)
-            tags.append(utils.tag_user(user))
+            tags.append(utils.tag_user(user,client))
     return f"Kicked {', '.join(tags)}"
 
 async def random_int(client, event, args):
@@ -85,7 +84,7 @@ async def whogay(client, event, args):
     if users_in_chat.total == 1:
         users_in_chat.append(await client.get_me())
     user = random.choice(users_in_chat)
-    return f"{utils.tag_user(user)} is gay af"
+    return f"{utils.tag_user(user,client)} is gay af"
 
 async def send_media(client, event, args):
     print(args)
@@ -122,7 +121,7 @@ async def instagram_add_dd(client, event, args):
 
 async def tag_everyone(client, event, args):
     chat = await client.get_entity(event.chat_id)
-    return " ".join([utils.tag_user(user) for user in await client.get_participants(chat)])
+    return " ".join([utils.tag_user(user) for user in await client.get_participants(chat) if not user.bot and not user.is_self])
     
 functions_dict = {
 'kick': kick,

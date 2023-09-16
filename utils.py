@@ -11,5 +11,5 @@ def user_full_name(user):
     return f"{user.first_name} {user.last_name}"
 
 def tag_user(user):
- return f"[{user_full_name(user)}](tg://user?id={user.id})"
+    return f"[{user_full_name(user)}](tg://user?id={user.id})"
 
