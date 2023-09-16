@@ -1,7 +1,5 @@
-from telethon.tl.functions.messages import GetMessagesRequest
-
 async def get_replied_message(client,event):
-    return await client.get_messages(event.chat_id, ids=event.reply_to_msg_id)
+    return (await client.get_messages(event.chat_id, ids=event.reply_to_msg_id))[0]
 
 def user_full_name(user):
     if not user.first_name:

@@ -1,14 +1,18 @@
 #!/bin/python3
 
-import subprocess, random, json,os
+import subprocess, random, json, re
+from http.client import HTTPConnection
+
 from telethon import events
 from telethon.sync import TelegramClient
 
 import utils
 
 proxy = None
-response = os.system("ping -c 1 telegram.org")
-if response != 0:
+try:
+    connection = HTTPConnection("telegram.org", port=80, timeout=1)
+    connection.request("HEAD", "/")
+except:
     proxy =("socks5", '127.0.0.1', 40000)
 
 creds_file = open("credentials.json")
@@ -22,7 +26,7 @@ def main():
         async def handler(event):
             splited_message = event.message.text.split()
             try:
-                command = functions_dict.get(splited_message[0])
+                command = functions_dict[splited_message[0]]
             except Exception:
                 return
 
@@ -39,15 +43,35 @@ def main():
         client.run_until_disconnected()
 
 async def kick(client, event, args):
-    sender = await utils.get_replied_message(client, event).sender
+    should_get_kicked = []
+    for arg in args:
+        id_pattern = re.compile(r"\[.*\]\(tg://user\?id=\d+\)")
+
+        id_match = id_pattern.match(arg)
+        if id_match:
+            should_get_kicked.append(await client.get_entity(int(id_match.group(1))))
+            continue
+
+        username_pattern = re.compile("^@.*")
+        username_match = username_pattern.match(arg)
+
+        if username_match:
+            should_get_kicked.append(await client.get_entity(username_match.group(0)))
+            continue
+
+    reply_sender = (await utils.get_replied_message(client, event)).sender
+    should_get_kicked.append(reply_sender)
+
     chat = await client.get_entity(event.chat_id)
     permissions = await client.get_permissions(chat, 'me')
     me = await client.get_me()
 
-    print(args)
-    if permissions.is_admin and me.id != sender.id:
-        await client.kick_participant(entity=chat, user=sender)
-        return f"Kicked ({utils.tag_user(sender)})"
+    tags =  []
+    for user in should_get_kicked:
+        if permissions.is_admin and me.id != user.id:
+            await client.kick_participant(entity=chat, user=user)
+            tags.append(utils.tag_user(user))
+    return f"Kicked {', '.join(tags)}"
 
 async def random_int(client, event, args):
     return str(random.randint(int(args[0]),int(args[1])))
