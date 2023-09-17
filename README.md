@@ -12,8 +12,8 @@ A telegram bot that connects to your account, And gives you shell superpowers!
 
     ```
 
-## Running the server
-Now you can do this to run the server:
+## Running the bot
+Now you can do this to run the bot:
 ```
 ./main.py
 ```

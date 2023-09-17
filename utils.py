@@ -1,5 +1,5 @@
 async def get_replied_message(client,event):
-    return (await client.get_messages(event.chat_id, ids=event.reply_to_msg_id))[0]
+    return await client.get_messages(event.chat_id, ids=event.reply_to_msg_id)
 
 def user_full_name(user):
     if not user.first_name:
