@@ -65,11 +65,11 @@ def main():
 
         client.run_until_disconnected()
 
-async def kick(**kwargs):
+async def get_entities(**kwargs):
     client = kwargs["client"]
     event = kwargs["event"]
     args = kwargs["args"]
-    should_get_kicked = []
+    output = []
     if event.message.entities:
         for entity in event.message.entities:
             id_pattern = re.compile(r"tg://user\?id=\d+")
@@ -79,28 +79,35 @@ async def kick(**kwargs):
             except:
                 continue
             if id_match:
-                should_get_kicked.append(await client.get_entity(int(id_match.group(0).replace("tg://user?id=", ""))))
+                output.append(await client.get_entity(int(id_match.group(0).replace("tg://user?id=", ""))))
 
     for arg in args:
         username_pattern = re.compile("^@.*")
         username_match = username_pattern.match(arg)
 
         if username_match:
-            should_get_kicked.append(await client.get_entity(username_match.group(0)))
+            output.append(await client.get_entity(username_match.group(0)))
             continue
 
     try:    
         messages = await utils.get_replied_message(client, event)
         reply_sender = messages.sender
-        should_get_kicked.append(reply_sender)
+        output.append(reply_sender)
     except:
         pass
 
-    chat = await client.get_entity(event.chat_id)
-    permissions = await client.get_permissions(chat, 'me')
+    return output
 
+async def kick(**kwargs):
+    client = kwargs["client"]
+    event = kwargs["event"]
+    args = kwargs["args"]
+
+    chat = await client.get_entity(event.chat_id)
+
+    permissions = await client.get_permissions(chat, 'me')
     tags =  []
-    for user in should_get_kicked:
+    for user in await get_entities(client=client, event=event, args=args):
         if permissions.is_admin and not user.is_self:
             try:
                 await client.kick_participant(entity=chat, user=user)
@@ -108,6 +115,24 @@ async def kick(**kwargs):
             except:
                 pass
     return f"Kicked {', '.join(tags)}"
+
+async def ban(**kwargs):
+    client = kwargs["client"]
+    event = kwargs["event"]
+    args = kwargs["args"]
+
+    chat = await client.get_entity(event.chat_id)
+
+    permissions = await client.get_permissions(chat, 'me')
+    tags =  []
+    for user in await get_entities(client=client, event=event, args=args):
+        if permissions.is_admin and not user.is_self:
+            try:
+                await client.edit_permissions(chat, user, view_messages=False)
+                tags.append(utils.tag_user(user))
+            except:
+                pass
+    return f"Banned {', '.join(tags)}"
 
 async def random_int(**kwargs):
     args = kwargs["args"]
@@ -215,7 +240,6 @@ async def parse_markdown(**kwargs):
 
     # add font config
     pre_message = f"""---
-lang: {"ar" if dict["lang"]=="en" else "en"}
 lang: ar
 mainfont: Vazirmatn Regular
 monofont: JetBrains Mono Regular
@@ -259,7 +283,10 @@ async def run_qalc(**kwargs):
 
 async def add_alias(**kwargs):
     args = kwargs["args"]
-    functions_dict[args[0]] = " ".join(args[1:]).replace("\\","")
+    functions_dict[args[0]] = " ".join(args[1:]).replace(r"\```","```")
+
+async def fix_keyboard_layout_misstype(**kwargs):
+    pass
 
 functions_dict = {
 'kick': kick,
@@ -269,7 +296,6 @@ functions_dict = {
 'whogay': whogay,
 'file': send_file,
 'medi': send_media,
-'alias': add_alias,
 # 'shfile': shell_to_file,
 # 'shmedi': shell_to_media,
 'dd': instagram_add_dd,
@@ -280,6 +306,8 @@ functions_dict = {
 'md': parse_markdown,
 'qalc': run_qalc,
 'times': string_times,
+'alias': add_alias,
+'ban': ban,
 }
 
 if __name__ == "__main__":
