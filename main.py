@@ -114,7 +114,8 @@ async def kick(**kwargs):
                 tags.append(utils.tag_user(user))
             except:
                 pass
-    return f"Kicked {', '.join(tags)}"
+    if tags:
+        return f"Kicked {', '.join(tags)}"
 
 async def ban(**kwargs):
     client = kwargs["client"]
@@ -132,7 +133,8 @@ async def ban(**kwargs):
                 tags.append(utils.tag_user(user))
             except:
                 pass
-    return f"Banned {', '.join(tags)}"
+    if tags:
+        return f"Banned {', '.join(tags)}"
 
 async def random_int(**kwargs):
     args = kwargs["args"]
