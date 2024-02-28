@@ -1,9 +1,14 @@
 #!/bin/python3
 
+import time
 import subprocess, random, json, re, math, io
 from http.client import HTTPConnection
+from telethon.tl.types import InputMediaPoll, PollAnswer
+from telethon import functions
+from telethon import functions, types
 
 from telethon import events
+import os
 from telethon.sync import TelegramClient
 
 import utils
@@ -15,11 +20,13 @@ try:
 except:
     proxy =("socks5", '127.0.0.1', 40000)
 
-creds_file = open("credentials.json")
+import pathlib
+dir = pathlib.Path(__file__).parent.resolve()
+creds_file = open(os.path.join(dir,"credentials.json"))
 creds = json.load(creds_file)
 
 def main():
-    with TelegramClient( creds["name"], creds["api_id"], creds["api_hash"], proxy=proxy) as client: 
+    with TelegramClient( os.path.join(dir,creds["name"]), creds["api_id"], creds["api_hash"], proxy=proxy) as client: 
         print("> BOT IS UP")
 
         @client.on(events.NewMessage(from_users="me"))
@@ -97,6 +104,14 @@ async def get_entities(**kwargs):
         pass
 
     return output
+async def everyone_print(**kwargs):
+    client = kwargs["client"]
+    event = kwargs["event"]
+    args = kwargs["args"]
+    chat = await client.get_entity(event.chat_id)
+    for user in await client.get_participants(chat):
+        print(user)
+
 
 async def kick(**kwargs):
     client = kwargs["client"]
@@ -194,12 +209,15 @@ async def instagram_add_dd(**kwargs):
     chat = await client.get_entity(event.chat_id)
     await client.send_message(chat,message.message.replace("instagram", "ddinstagram"), reply_to=message)
 
+async def get_tags(chat, client):
+    return [utils.tag_user(user) for user in await client.get_participants(chat) if not user.bot and not user.is_self]
+
 async def everyone(**kwargs):
     client = kwargs["client"]
     event = kwargs["event"]
     args = kwargs["args"]
     chat = await client.get_entity(event.chat_id)
-    return " ".join([utils.tag_user(user) for user in await client.get_participants(chat) if not user.bot and not user.is_self]+args)
+    return " ".join(await get_tags(chat,client))
 
 async def tag_everyone(**kwargs):
     client = kwargs["client"]
@@ -208,11 +226,17 @@ async def tag_everyone(**kwargs):
 
     chat = await client.get_entity(event.chat_id)
     message = await utils.get_replied_message(client, event)
-    tags = await everyone(client=client,event=event,args=args)
-    try:
-        await client.send_message(chat,tags, reply_to=message)
-    except:
-        await client.send_message(chat,tags)
+    tags = await get_tags(chat, client)
+    print(tags)
+    n = 5
+    for list in [tags[i * n:(i + 1) * n] for i in range((len(tags) + n - 1) // n )]:
+        if len(list):
+            send = " ".join(list)
+            try:
+                await client.send_message(chat,send, reply_to=message)
+            except:
+                await client.send_message(chat,send)
+
 
 async def eval_python(**kwargs):
     args = kwargs["args"]
@@ -287,7 +311,108 @@ async def add_alias(**kwargs):
     args = kwargs["args"]
     functions_dict[args[0]] = " ".join(args[1:]).replace(r"\```","```")
 
+async def persian_to_english_numbers(**kwargs):
+    client = kwargs["client"]
+    event = kwargs["event"]
+    persian_numbers = {
+        '۰': '0',
+        '۱': '1',
+        '۲': '2',
+        '۳': '3',
+        '۴': '4',
+        '۵': '5',
+        '۶': '6',
+        '۷': '7',
+        '۸': '8',
+        '۹': '9'
+    }
+    message = await utils.get_replied_message(client, event)
+    
+    english_string = ""
+    
+    for char in message.message:
+        if char in persian_numbers:
+            english_string += persian_numbers[char]
+        else:
+            english_string += char
+    
+    return english_string
+
 async def fix_keyboard_layout_misstype(**kwargs):
+    pass
+
+async def repeat_message(**kwargs):
+    client = kwargs["client"]
+    event = kwargs["event"]
+    args = kwargs["args"]
+    chat = await client.get_entity(event.chat_id)
+
+    await client.delete_messages(chat, [event.message])
+    message = await utils.get_replied_message(client, event)
+    str_to_repeat = message.message
+
+    async def till_stop(message):
+        if len(args) > 1 and int(args[1]) == 1:
+            result = await client(functions.messages.GetPeerDialogsRequest(peers=[chat]))
+            return result.dialogs[0].read_outbox_max_id < message.id
+        else:
+            return True
+
+    while await till_stop(message):
+        await client.delete_messages(chat, [message])
+        message = await client.send_message(chat, str_to_repeat)
+        time.sleep(int(args[0]))
+
+async def times_cmd(**kwargs):
+    client = kwargs["client"]
+    event = kwargs["event"]
+    args = kwargs["args"]
+    message = await utils.get_replied_message(client, event)
+
+    for i in range(int(args[0])):
+        command = functions_dict[args[1]]
+        await command(
+                    client=client,
+                    event=event,
+                    args=args[2:],
+                    message=message,
+                    )
+
+async def username_to_id(**kwargs):
+    client = kwargs["client"]
+    # event = kwargs["event"]
+    args = kwargs["args"]
+    # message = kwargs["message"]
+    chat = await client.get_entity(args[0])
+    return str(chat.id)
+
+async def dislike_message(message, client, chat):
+    await client(functions.messages.SendReactionRequest(
+        peer=chat,
+        msg_id=message.id,
+        big=True,
+        add_to_recent=True,
+        reaction=[types.ReactionEmoji(
+            emoticon='👎'
+        )]
+    ))
+
+async def dislike_replied_user_messages(**kwargs):
+    client = kwargs["client"]
+    event = kwargs["event"]
+    chat = await client.get_entity(event.chat_id)
+    message = await utils.get_replied_message(client, event)
+    async for message in client.iter_messages(chat, from_user=message.from_id):
+        await dislike_message(message, client, chat)
+
+async def dislike(**kwargs):
+    client = kwargs["client"]
+    event = kwargs["event"]
+    message = await utils.get_replied_message(client, event)
+    chat = await client.get_entity(event.chat_id)
+    await dislike_message(message, client, chat)
+
+async def save_replies_in_file(**kwargs):
     pass
 
 functions_dict = {
@@ -310,6 +435,14 @@ functions_dict = {
 'times': string_times,
 'alias': add_alias,
 'ban': ban,
+'print': everyone_print,
+'eng': persian_to_english_numbers,
+'rep': repeat_message,
+'timescmd': times_cmd,
+'whois': username_to_id,
+'dislike': dislike,
+'grabrep': save_replies_in_file,
+'dislikeall': dislike_replied_user_messages,
 }
 
 if __name__ == "__main__":
