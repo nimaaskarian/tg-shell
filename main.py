@@ -415,6 +415,30 @@ async def dislike(**kwargs):
 async def save_replies_in_file(**kwargs):
     pass
 
+async def delete_up(**kwargs):
+    event = kwargs["event"]
+    client = kwargs["client"]
+    chat = await client.get_entity(event.chat_id)
+    args = kwargs["args"]
+    delete_count = int(args[0])
+    try:
+        ignore_first = int(args[0])
+    except:
+        ignore_first = 1
+
+    async for message in client.iter_messages(chat):
+        if ignore_first:
+            ignore_first-=1
+            continue
+
+        if delete_count == 0:
+            break
+        await client.delete_messages(chat, [message])
+        delete_count -= 1
+
+
+
+
 functions_dict = {
 'kick': kick,
 'rand':  random_int,
@@ -442,6 +466,7 @@ functions_dict = {
 'whois': username_to_id,
 'dislike': dislike,
 'grabrep': save_replies_in_file,
+'del': delete_up,
 'dislikeall': dislike_replied_user_messages,
 }
 
